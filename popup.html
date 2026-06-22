@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>FASIH SE Progress</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <h1>FASIH SE Progress</h1>
+    <p class="subtitle">Sensus Ekonomi 2026</p>
+  </div>
+
+  <div class="content">
+    <div id="step-init" class="step">
+      <div class="center"><div class="spinner"></div></div>
+    </div>
+
+    <div id="step-wrong-page" class="step hidden">
+      <div class="notice notice-warn">
+        Buka <strong>fasih-sm.bps.go.id</strong> terlebih dahulu, lalu klik ikon ekstensi ini.
+      </div>
+    </div>
+
+    <div id="step-role" class="step hidden">
+      <p class="step-label">Pilih Peran:</p>
+      <div class="btn-group">
+        <button class="btn btn-role" id="btn-pengawas">Pengawas</button>
+        <button class="btn btn-role" id="btn-pencacah">Pencacah</button>
+      </div>
+    </div>
+
+    <div id="step-loading" class="step hidden">
+      <div class="center">
+        <div class="spinner"></div>
+        <p>Mengambil daftar kabupaten...</p>
+      </div>
+    </div>
+
+    <div id="step-select-kabs" class="step hidden">
+      <p class="step-label">Pilih Kabupaten/Kota:</p>
+      <div class="kab-header">
+        <label class="chk-label">
+          <input type="checkbox" id="chk-all"> Pilih Semua
+        </label>
+        <span id="kab-count" class="kab-count">0 dipilih</span>
+      </div>
+      <div id="kab-list" class="kab-list"></div>
+      <button id="btn-start" class="btn btn-primary" disabled>Mulai Ekstrak</button>
+    </div>
+
+    <div id="step-progress" class="step hidden">
+      <div class="progress-status">
+        <div class="spinner spinner-sm"></div>
+        <span id="progress-text">Memproses...</span>
+      </div>
+      <div id="log" class="log"></div>
+    </div>
+
+    <div id="step-done" class="step hidden">
+      <div class="notice notice-success">
+        <strong>Selesai!</strong>
+        <div id="done-summary"></div>
+      </div>
+      <p class="hint">File JSON &amp; CSV telah diunduh otomatis.</p>
+      <button id="btn-restart" class="btn btn-secondary">Mulai Lagi</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

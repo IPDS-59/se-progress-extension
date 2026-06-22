@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "FASIH SE Progress",
+  "version": "1.0.0",
+  "description": "Ekstrak progress Sensus Ekonomi dari aplikasi FASIH",
+  "permissions": ["activeTab", "storage", "tabs"],
+  "host_permissions": ["https://fasih-sm.bps.go.id/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "FASIH SE Progress"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://fasih-sm.bps.go.id/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
