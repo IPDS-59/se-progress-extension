@@ -2,7 +2,6 @@ const BASE = 'https://fasih-sm.bps.go.id/app/api';
 const ASSIGN = BASE + '/analytic/api/v2/assignment/report-progress-by-responsibility';
 const REGION = BASE + '/region/api/v1/region';
 const GROUP_ID = 'a45adac1-e711-4c15-b3f9-1f30fc151565';
-const PROV = '18';
 const SIZE_CANDIDATES = [10, 5];
 const CAP = 1000, DELAY_MS = 400, MAX_RETRY = 4;
 
@@ -98,15 +97,20 @@ async function fetchAll(region, label) {
 }
 
 
-async function handleGetKabs(role) {
+async function handleGetKabs(role, prov) {
   try {
     currentRoleId = role.id;
-    let kabs = await getRegion('level2', { groupId: GROUP_ID, level1FullCode: PROV });
+    let kabs = await getRegion('level2', { groupId: GROUP_ID, level1FullCode: prov });
     if (!kabs.length) kabs = await getRegion('level2', { groupId: GROUP_ID });
     if (!kabs.length || !kabs[0].id) return { ok: false, error: 'Struktur region tidak terdeteksi' };
     return { ok: true, kabs };
   } catch (e) {
-    return { ok: false, error: e.message };
+    const msg = /HTTP 403/.test(e.message)
+      ? 'Akses ditolak (403). Pastikan Anda membuka fasih-sm.bps.go.id/app (bukan halaman lama) dan akun ini memiliki akses ke data SE2026.'
+      : /HTTP 401/.test(e.message)
+        ? 'Sesi FASIH kedaluwarsa. Refresh halaman FASIH (Ctrl+R / Cmd+R) lalu coba lagi.'
+        : e.message;
+    return { ok: false, error: msg };
   }
 }
 
@@ -115,12 +119,16 @@ async function handleFetchData(role, chosenKabs) {
   currentRoleId = role.id;
 
   SIZE = null;
+  let lastProbeStatus = 0;
   for (const s of SIZE_CANDIDATES) {
     const r = await callAssign(0, s, regionObj());
+    lastProbeStatus = r.status;
     if (r.ok) { SIZE = s; break; }
   }
   if (!SIZE) {
-    const msg = 'Gagal: semua ukuran halaman ditolak server';
+    const msg = (lastProbeStatus === 403 || lastProbeStatus === 401)
+      ? 'Sesi FASIH kedaluwarsa. Refresh halaman FASIH (Ctrl+R / Cmd+R) lalu coba lagi.'
+      : 'Gagal: server menolak semua ukuran halaman. Periksa koneksi VPN.';
     sendProgress(msg, 'error');
     chrome.runtime.sendMessage({ type: 'FETCH_ERROR', error: msg }).catch(() => {});
     isRunning = false;
@@ -216,7 +224,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message.type === 'GET_KABS') {
-    handleGetKabs(message.role).then(sendResponse);
+    handleGetKabs(message.role, message.prov || '18').then(sendResponse);
     return true;
   }
   if (message.type === 'FETCH_DATA') {

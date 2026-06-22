@@ -1,4 +1,5 @@
 const FASIH_HOST = 'fasih-sm.bps.go.id';
+const FASIH_APP = 'fasih-sm.bps.go.id/app';
 
 const ROLES = {
   pengawas: { id: '93bcf446-c4c1-4462-8ed0-4b0f7ae89e52', label: 'pengawas' },
@@ -6,6 +7,7 @@ const ROLES = {
 };
 
 let selectedRole = null;
+let selectedProv = '18';
 let kabList = [];
 let activeTabId = null;
 
@@ -79,6 +81,13 @@ async function init() {
     return;
   }
 
+  if (!tab.url.includes(FASIH_APP)) {
+    document.querySelector('#step-wrong-page .notice-warn').innerHTML =
+      'Buka <strong>fasih-sm.bps.go.id/app</strong> (bukan halaman lama), lalu klik ikon ekstensi ini lagi.';
+    show('step-wrong-page');
+    return;
+  }
+
   activeTabId = tab.id;
 
   // Confirm content script is active (it won't be if the page was open before extension was installed)
@@ -89,7 +98,7 @@ async function init() {
       show('step-wrong-page');
       return;
     }
-    show('step-role');
+    show('step-prov');
   });
 }
 
@@ -100,7 +109,7 @@ async function selectRole(roleKey) {
   show('step-loading');
 
   const tab = activeTabId ? { id: activeTabId } : await getCurrentTab();
-  chrome.tabs.sendMessage(tab.id, { type: 'GET_KABS', role: selectedRole }, (response) => {
+  chrome.tabs.sendMessage(tab.id, { type: 'GET_KABS', role: selectedRole, prov: selectedProv }, (response) => {
     if (chrome.runtime.lastError || !response?.ok) {
       const detail = response?.error || chrome.runtime.lastError?.message || 'Periksa koneksi VPN lalu coba lagi.';
       document.getElementById('error-detail').textContent = detail;
@@ -142,6 +151,11 @@ document.getElementById('chk-all').addEventListener('change', function () {
   updateStartBtn();
 });
 
+document.getElementById('btn-prov-next').addEventListener('click', () => {
+  selectedProv = document.getElementById('sel-prov').value;
+  show('step-role');
+});
+
 document.getElementById('btn-pengawas').addEventListener('click', () => selectRole('pengawas'));
 document.getElementById('btn-pencacah').addEventListener('click', () => selectRole('pencacah'));
 
@@ -163,14 +177,14 @@ document.getElementById('btn-view-results').addEventListener('click', () => {
 document.getElementById('btn-retry').addEventListener('click', () => {
   document.getElementById('btn-pengawas').disabled = false;
   document.getElementById('btn-pencacah').disabled = false;
-  show('step-role');
+  show('step-prov');
 });
 
 document.getElementById('btn-restart').addEventListener('click', async () => {
   await chrome.storage.session.remove('fasih');
   document.getElementById('btn-pengawas').disabled = false;
   document.getElementById('btn-pencacah').disabled = false;
-  show('step-role');
+  show('step-prov');
 });
 
 init();
