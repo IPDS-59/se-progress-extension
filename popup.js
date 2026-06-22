@@ -51,7 +51,7 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 async function getCurrentTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   return tab;
 }
 
@@ -80,7 +80,17 @@ async function init() {
   }
 
   activeTabId = tab.id;
-  show('step-role');
+
+  // Confirm content script is active (it won't be if the page was open before extension was installed)
+  chrome.tabs.sendMessage(tab.id, { type: 'PING' }, (response) => {
+    if (chrome.runtime.lastError || !response?.ok) {
+      document.querySelector('#step-wrong-page .notice-warn').innerHTML =
+        'Tab FASIH ditemukan, tapi perlu <strong>reload halaman</strong> terlebih dahulu (Ctrl+R / Cmd+R).';
+      show('step-wrong-page');
+      return;
+    }
+    show('step-role');
+  });
 }
 
 async function selectRole(roleKey) {

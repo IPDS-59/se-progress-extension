@@ -229,6 +229,10 @@ async function handleFetchData(role, chosenKabs) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'PING') {
+    sendResponse({ ok: true });
+    return false;
+  }
   if (message.type === 'GET_KABS') {
     handleGetKabs(message.role).then(sendResponse);
     return true;
