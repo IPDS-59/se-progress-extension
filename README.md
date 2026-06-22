@@ -64,4 +64,4 @@ npm run build
 
 ## Lisensi
 
-Internal BPS Provinsi Lampung — tidak untuk distribusi publik.
+Internal BPS Provinsi Sulawesi Tengah — tidak untuk distribusi publik.
