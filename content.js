@@ -232,7 +232,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message.type === 'GET_KABS') {
-    handleGetKabs(message.role, message.prov || '18').then(sendResponse);
+    handleGetKabs(message.role, message.prov || '72').then(sendResponse);
     return true;
   }
   if (message.type === 'FETCH_DATA') {
