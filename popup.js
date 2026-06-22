@@ -102,7 +102,9 @@ async function selectRole(roleKey) {
   const tab = activeTabId ? { id: activeTabId } : await getCurrentTab();
   chrome.tabs.sendMessage(tab.id, { type: 'GET_KABS', role: selectedRole }, (response) => {
     if (chrome.runtime.lastError || !response?.ok) {
-      show('step-wrong-page');
+      const detail = response?.error || chrome.runtime.lastError?.message || 'Periksa koneksi VPN lalu coba lagi.';
+      document.getElementById('error-detail').textContent = detail;
+      show('step-error');
       return;
     }
     kabList = response.kabs;
@@ -152,6 +154,12 @@ document.getElementById('btn-start').addEventListener('click', async () => {
 
   const tab = activeTabId ? { id: activeTabId } : await getCurrentTab();
   chrome.tabs.sendMessage(tab.id, { type: 'FETCH_DATA', role: selectedRole, kabs: chosen });
+});
+
+document.getElementById('btn-retry').addEventListener('click', () => {
+  document.getElementById('btn-pengawas').disabled = false;
+  document.getElementById('btn-pencacah').disabled = false;
+  show('step-role');
 });
 
 document.getElementById('btn-restart').addEventListener('click', async () => {
