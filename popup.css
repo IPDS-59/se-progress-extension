@@ -138,3 +138,4 @@ body {
 .log-error { color: #c0392b; font-weight: 500; }
 
 .hint { font-size: 11px; color: #999; margin: 8px 0 12px; }
+.btn-ghost { background: transparent; color: #999; border-color: transparent; width: 100%; text-align: center; margin-top: 4px; font-size: 12px; }

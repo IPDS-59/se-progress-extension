@@ -1,0 +1,18 @@
+{
+  "name": "se-progress-extension",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/results.jsx --bundle --minify --outfile=results.js && tailwindcss -i src/results.css -o results.css --minify",
+    "dev": "concurrently \"esbuild src/results.jsx --bundle --watch --outfile=results.js\" \"tailwindcss -i src/results.css -o results.css --watch\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "esbuild": "^0.25.5",
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

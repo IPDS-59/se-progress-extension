@@ -156,6 +156,10 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   chrome.tabs.sendMessage(tab.id, { type: 'FETCH_DATA', role: selectedRole, kabs: chosen });
 });
 
+document.getElementById('btn-view-results').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('results.html') });
+});
+
 document.getElementById('btn-retry').addEventListener('click', () => {
   document.getElementById('btn-pengawas').disabled = false;
   document.getElementById('btn-pencacah').disabled = false;

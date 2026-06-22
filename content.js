@@ -97,16 +97,6 @@ async function fetchAll(region, label) {
   return { recs, total, error, capped: total != null && total > recs.length };
 }
 
-function triggerDownload(content, mimeType, filename) {
-  const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 
 async function handleGetKabs(role) {
   try {
@@ -201,13 +191,6 @@ async function handleFetchData(role, chosenKabs) {
   const tag = chosenKabs.length === 1
     ? chosenKabs[0].name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
     : chosenKabs.length + 'kab';
-  const tgl = new Date().toISOString().slice(0, 10);
-
-  triggerDownload(
-    JSON.stringify(all, null, 2),
-    'application/json',
-    'fasih_' + role.label + '_' + tag + '_raw_' + tgl + '.json'
-  );
 
   const rows = [];
   for (const u of all)
@@ -215,13 +198,12 @@ async function handleFetchData(role, chosenKabs) {
       for (const st of (reg.statusBreakdown || []))
         rows.push({ userId: u.userId, username: u.username, email: u.email, roleName: u.roleName, userTotal: u.total, regionCode: reg.regionCode, regionTotal: reg.total, status: st.status, count: st.count });
 
-  const cols = ['userId', 'username', 'email', 'roleName', 'userTotal', 'regionCode', 'regionTotal', 'status', 'count'];
-  const esc = (v) => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-  const csv = '﻿' + cols.join(',') + '\n' + rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
-
-  triggerDownload(csv, 'text/csv;charset=utf-8', 'fasih_' + role.label + '_' + tag + '_flat_' + tgl + '.csv');
-
   const result = { total: all.length, csvRows: rows.length };
+
+  chrome.storage.local.set({
+    fasih_result: { role: role.label, tag, date: new Date().toISOString(), all, rows, report, incomplete },
+  }).catch(() => {});
+
   chrome.storage.session.set({ fasih: { state: 'done', result } }).catch(() => {});
   chrome.runtime.sendMessage({ type: 'DONE', result }).catch(() => {});
 
