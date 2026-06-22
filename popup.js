@@ -67,6 +67,8 @@ async function init() {
     show('step-progress');
     const el = document.getElementById('progress-text');
     if (el) el.textContent = stored.fasih.statusText || 'Memproses...';
+    const buffered = stored.fasih.log || [];
+    buffered.forEach(entry => appendLog(entry.text, entry.logType));
     return;
   }
 

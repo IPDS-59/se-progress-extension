@@ -36,11 +36,15 @@ function sendProgress(text, logType = 'info', statusText = null) {
   const msg = { type: 'PROGRESS', text, logType };
   if (statusText) msg.statusText = statusText;
   chrome.runtime.sendMessage(msg).catch(() => {});
-  if (statusText) {
-    chrome.storage.session.get('fasih').then(s => {
-      chrome.storage.session.set({ fasih: { ...(s.fasih || {}), state: 'running', statusText } });
-    }).catch(() => {});
-  }
+  chrome.storage.session.get('fasih').then(s => {
+    const prev = s.fasih || {};
+    const log = prev.log || [];
+    log.push({ text, logType });
+    if (log.length > 500) log.splice(0, log.length - 500);
+    const update = { ...prev, log };
+    if (statusText) { update.state = 'running'; update.statusText = statusText; }
+    chrome.storage.session.set({ fasih: update });
+  }).catch(() => {});
 }
 
 async function getRegion(level, params) {
@@ -117,6 +121,10 @@ async function handleGetKabs(role, prov) {
 async function handleFetchData(role, chosenKabs) {
   isRunning = true;
   currentRoleId = role.id;
+
+  chrome.storage.session.get('fasih').then(s => {
+    chrome.storage.session.set({ fasih: { ...(s.fasih || {}), log: [] } });
+  }).catch(() => {});
 
   SIZE = null;
   let lastProbeStatus = 0;

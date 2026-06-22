@@ -43,6 +43,45 @@ function aggregateUsers(rows = []) {
   return { users, statuses };
 }
 
+function loadSheetJS() {
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX !== 'undefined') return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Gagal memuat SheetJS'));
+    document.head.appendChild(s);
+  });
+}
+
+function buildPivot(rows = []) {
+  const STATUS_COLS = ['DRAFT', 'OPEN', 'SUBMITTED BY Pencacah', 'APPROVED BY Pengawas', 'REJECTED BY Pengawas'];
+  const pivot = {};
+  for (const row of rows) {
+    const key = row.email + '_' + row.regionCode;
+    if (!pivot[key]) {
+      pivot[key] = {
+        'Email Petugas':            row.email     || '',
+        'Username':                 row.username  || '',
+        'Peran':                    row.roleName  || '',
+        'Kode Wilayah (SubSLS)':    row.regionCode || '',
+        'Total Assign':             Number(row.userTotal) || 0,
+        'DRAFT': 0, 'OPEN': 0,
+        'SUBMITTED BY Pencacah': 0,
+        'APPROVED BY Pengawas':  0,
+        'REJECTED BY Pengawas':  0,
+      };
+    }
+    const s = (row.status || '').toUpperCase();
+    if (s.includes('DRAFT'))     pivot[key]['DRAFT']                  += Number(row.count);
+    else if (s.includes('OPEN')) pivot[key]['OPEN']                   += Number(row.count);
+    else if (s.includes('SUBMITTED')) pivot[key]['SUBMITTED BY Pencacah'] += Number(row.count);
+    else if (s.includes('APPROVED'))  pivot[key]['APPROVED BY Pengawas']  += Number(row.count);
+    else if (s.includes('REJECTED'))  pivot[key]['REJECTED BY Pengawas']  += Number(row.count);
+  }
+  return Object.values(pivot);
+}
+
 function fmtDate(iso = '') {
   if (!iso) return '-';
   const d = new Date(iso);
@@ -142,6 +181,20 @@ function App() {
     a.click();
   };
 
+  const downloadXLSX = async () => {
+    if (!data?.rows) return;
+    try {
+      await loadSheetJS();
+      const pivotRows = buildPivot(data.rows);
+      const ws = XLSX.utils.json_to_sheet(pivotRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Rekap FASIH');
+      XLSX.writeFile(wb, `fasih_${data.role}_${data.tag}_rekap_${data.date?.slice(0, 10)}.xlsx`);
+    } catch (e) {
+      alert('Gagal membuat file Excel: ' + e.message);
+    }
+  };
+
   const downloadCSV = () => {
     if (!data?.rows) return;
     const cols = ['userId','username','email','roleName','userTotal','regionCode','regionTotal','status','count'];
@@ -200,9 +253,15 @@ function App() {
             </button>
             <button
               onClick={downloadCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#1a5276] rounded-lg text-sm font-semibold hover:bg-blue-50 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition"
             >
               ↓ CSV
+            </button>
+            <button
+              onClick={downloadXLSX}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#1a5276] rounded-lg text-sm font-semibold hover:bg-blue-50 transition"
+            >
+              ↓ Excel
             </button>
           </div>
         </div>

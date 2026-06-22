@@ -9,7 +9,7 @@ Chrome extension (Manifest V3) untuk mengekstrak data progres petugas Sensus Eko
 - Pilih kabupaten/kota yang ingin diekstrak
 - Log progres real-time saat pengambilan data
 - Halaman visualisasi hasil: tabel petugas, progress bar, filter & sort
-- Unduh hasil sebagai JSON atau CSV
+- Unduh hasil sebagai JSON, CSV, atau Excel (.xlsx) dengan tabel pivot per petugas
 
 ## Cara Pakai
 
