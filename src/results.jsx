@@ -55,31 +55,36 @@ function loadSheetJS() {
 }
 
 function buildPivot(rows = []) {
-  const STATUS_COLS = ['DRAFT', 'OPEN', 'SUBMITTED BY Pencacah', 'APPROVED BY Pengawas', 'REJECTED BY Pengawas'];
-  const pivot = {};
+  const map = new Map();
+  const statusSet = new Set();
+
   for (const row of rows) {
-    const key = row.email + '_' + row.regionCode;
-    if (!pivot[key]) {
-      pivot[key] = {
-        'Email Petugas':            row.email     || '',
-        'Username':                 row.username  || '',
-        'Peran':                    row.roleName  || '',
-        'Kode Wilayah (SubSLS)':    row.regionCode || '',
-        'Total Assign':             Number(row.userTotal) || 0,
-        'DRAFT': 0, 'OPEN': 0,
-        'SUBMITTED BY Pencacah': 0,
-        'APPROVED BY Pengawas':  0,
-        'REJECTED BY Pengawas':  0,
-      };
+    if (!map.has(row.userId)) {
+      map.set(row.userId, {
+        username: row.username || '',
+        email:    row.email    || '',
+        roleName: row.roleName || '',
+        total:    Number(row.userTotal) || 0,
+        byStatus: {},
+      });
     }
-    const s = (row.status || '').toUpperCase();
-    if (s.includes('DRAFT'))     pivot[key]['DRAFT']                  += Number(row.count);
-    else if (s.includes('OPEN')) pivot[key]['OPEN']                   += Number(row.count);
-    else if (s.includes('SUBMITTED')) pivot[key]['SUBMITTED BY Pencacah'] += Number(row.count);
-    else if (s.includes('APPROVED'))  pivot[key]['APPROVED BY Pengawas']  += Number(row.count);
-    else if (s.includes('REJECTED'))  pivot[key]['REJECTED BY Pengawas']  += Number(row.count);
+    const u = map.get(row.userId);
+    const s = row.status || '';
+    u.byStatus[s] = (u.byStatus[s] || 0) + Number(row.count);
+    statusSet.add(s);
   }
-  return Object.values(pivot);
+
+  const statuses   = [...statusSet].sort();
+  const doneStatus = statuses.find(isDone) || null;
+
+  return [...map.values()].map((u, i) => {
+    const done = doneStatus ? (u.byStatus[doneStatus] || 0) : 0;
+    const pct  = u.total > 0 ? Math.round(done / u.total * 100) : 0;
+    const out  = { 'No.': i + 1, 'Username': u.username, 'Email': u.email, 'Peran': u.roleName, 'Target': u.total };
+    statuses.forEach(s => { out[s] = u.byStatus[s] || 0; });
+    if (doneStatus) out['Progress (%)'] = pct;
+    return out;
+  });
 }
 
 function fmtDate(iso = '') {
@@ -187,6 +192,15 @@ function App() {
       await loadSheetJS();
       const pivotRows = buildPivot(data.rows);
       const ws = XLSX.utils.json_to_sheet(pivotRows);
+      const colWidths = [
+        { wch: 5 },   // No.
+        { wch: 22 },  // Username
+        { wch: 32 },  // Email
+        { wch: 14 },  // Peran
+        { wch: 10 },  // Target
+        ...Object.keys(pivotRows[0] || {}).slice(5).map(() => ({ wch: 20 })),
+      ];
+      ws['!cols'] = colWidths;
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap FASIH');
       XLSX.writeFile(wb, `fasih_${data.role}_${data.tag}_rekap_${data.date?.slice(0, 10)}.xlsx`);
@@ -358,11 +372,11 @@ function App() {
                       <td className="px-4 py-3 text-gray-400 tabular-nums">{i + 1}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{user.username}</td>
                       <td className="px-4 py-3 text-gray-500">{user.email}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{user.total}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{user.total.toLocaleString('id-ID')}</td>
                       {statuses.map(s => (
                         <td key={s} className="px-4 py-3 text-right tabular-nums">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(s)}`}>
-                            {user.byStatus[s] || 0}
+                            {(user.byStatus[s] || 0).toLocaleString('id-ID')}
                           </span>
                         </td>
                       ))}
