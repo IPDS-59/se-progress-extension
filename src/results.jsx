@@ -213,14 +213,20 @@ function App() {
   };
 
   const downloadCSV = () => {
-    if (!data?.rows) return;
-    const cols = ['userId','username','email','roleName','userTotal','regionCode','regionTotal','status','count'];
-    const esc  = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    const csv  = '﻿' + cols.join(',') + '\n' + data.rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
+    if (!users.length) return;
+    const esc = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const headers = ['No.', 'Username', 'Email', 'Peran', 'Target', ...statuses, ...(doneStatus ? ['Progress (%)'] : [])];
+    const rows = users.map((u, i) => {
+      const done = doneStatus ? (u.byStatus[doneStatus] || 0) : 0;
+      const pct  = u.total > 0 ? Math.round(done / u.total * 100) : 0;
+      const cols = [i + 1, u.username, u.email, u.roleName, u.total, ...statuses.map(s => u.byStatus[s] || 0), ...(doneStatus ? [pct] : [])];
+      return cols.map(esc).join(',');
+    });
+    const csv  = '﻿' + headers.map(esc).join(',') + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a    = document.createElement('a');
     a.href     = URL.createObjectURL(blob);
-    a.download = `fasih_${data.role}_${data.tag}_flat_${data.date?.slice(0, 10)}.csv`;
+    a.download = `fasih_${data.role}_${data.tag}_rekap_${data.date?.slice(0, 10)}.csv`;
     a.click();
   };
 
