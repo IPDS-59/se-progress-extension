@@ -191,16 +191,44 @@ function App() {
     try {
       await loadSheetJS();
       const pivotRows = buildPivot(data.rows);
+      if (!pivotRows.length) return;
+
+      const headers = Object.keys(pivotRows[0]);
+      const TEXT_COLS  = new Set(['Username', 'Email', 'Peran']);
+      const NUM_FMT    = '#,##0';
+      const PCT_FMT    = '0"%"';
+
       const ws = XLSX.utils.json_to_sheet(pivotRows);
-      const colWidths = [
+      const range = XLSX.utils.decode_range(ws['!ref']);
+
+      for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[addr];
+          if (!cell) continue;
+          const header = headers[C];
+          if (TEXT_COLS.has(header)) {
+            cell.t = 's';
+            cell.v = String(cell.v ?? '');
+          } else if (header === 'Progress (%)') {
+            cell.t = 'n';
+            cell.z = PCT_FMT;
+          } else if (header !== 'No.') {
+            cell.t = 'n';
+            cell.z = NUM_FMT;
+          }
+        }
+      }
+
+      ws['!cols'] = [
         { wch: 5 },   // No.
         { wch: 22 },  // Username
         { wch: 32 },  // Email
         { wch: 14 },  // Peran
         { wch: 10 },  // Target
-        ...Object.keys(pivotRows[0] || {}).slice(5).map(() => ({ wch: 20 })),
+        ...headers.slice(5).map(h => ({ wch: h === 'Progress (%)' ? 12 : 20 })),
       ];
-      ws['!cols'] = colWidths;
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap FASIH');
       XLSX.writeFile(wb, `fasih_${data.role}_${data.tag}_rekap_${data.date?.slice(0, 10)}.xlsx`);
