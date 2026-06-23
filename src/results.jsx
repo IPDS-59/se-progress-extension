@@ -54,38 +54,6 @@ function loadSheetJS() {
   });
 }
 
-function buildPivot(rows = []) {
-  const map = new Map();
-  const statusSet = new Set();
-
-  for (const row of rows) {
-    if (!map.has(row.userId)) {
-      map.set(row.userId, {
-        username: row.username || '',
-        email:    row.email    || '',
-        roleName: row.roleName || '',
-        total:    Number(row.userTotal) || 0,
-        byStatus: {},
-      });
-    }
-    const u = map.get(row.userId);
-    const s = row.status || '';
-    u.byStatus[s] = (u.byStatus[s] || 0) + Number(row.count);
-    statusSet.add(s);
-  }
-
-  const statuses   = [...statusSet].sort();
-  const doneStatus = statuses.find(isDone) || null;
-
-  return [...map.values()].map((u, i) => {
-    const done = doneStatus ? (u.byStatus[doneStatus] || 0) : 0;
-    const pct  = u.total > 0 ? Math.round(done / u.total * 100) : 0;
-    const out  = { 'No.': i + 1, 'Username': u.username, 'Email': u.email, 'Peran': u.roleName, 'Target': u.total };
-    statuses.forEach(s => { out[s] = u.byStatus[s] || 0; });
-    if (doneStatus) out['Progress (%)'] = pct;
-    return out;
-  });
-}
 
 function fmtDate(iso = '') {
   if (!iso) return '-';
@@ -187,19 +155,26 @@ function App() {
   };
 
   const downloadXLSX = async () => {
-    if (!data?.rows) return;
+    if (!users.length) return;
     try {
       await loadSheetJS();
-      const pivotRows = buildPivot(data.rows);
-      if (!pivotRows.length) return;
 
-      const headers = Object.keys(pivotRows[0]);
-      const TEXT_COLS  = new Set(['Username', 'Email', 'Peran']);
-      const NUM_FMT    = '#,##0';
-      const PCT_FMT    = '0"%"';
+      const TEXT_COLS = new Set(['Username', 'Email', 'Peran']);
+      const NUM_FMT   = '#,##0';
+      const PCT_FMT   = '0"%"';
 
-      const ws = XLSX.utils.json_to_sheet(pivotRows);
-      const range = XLSX.utils.decode_range(ws['!ref']);
+      const pivotRows = users.map((u, i) => {
+        const done = doneStatus ? (u.byStatus[doneStatus] || 0) : 0;
+        const pct  = u.total > 0 ? Math.round(done / u.total * 100) : 0;
+        const row  = { 'No.': i + 1, 'Username': u.username, 'Email': u.email, 'Peran': u.roleName, 'Target': u.total };
+        statuses.forEach(s => { row[s] = u.byStatus[s] || 0; });
+        if (doneStatus) row['Progress (%)'] = pct;
+        return row;
+      });
+
+      const headers = Object.keys(pivotRows[0] || {});
+      const ws      = XLSX.utils.json_to_sheet(pivotRows);
+      const range   = XLSX.utils.decode_range(ws['!ref']);
 
       for (let R = range.s.r + 1; R <= range.e.r; R++) {
         for (let C = range.s.c; C <= range.e.c; C++) {
@@ -221,11 +196,11 @@ function App() {
       }
 
       ws['!cols'] = [
-        { wch: 5 },   // No.
-        { wch: 22 },  // Username
-        { wch: 32 },  // Email
-        { wch: 14 },  // Peran
-        { wch: 10 },  // Target
+        { wch: 5 },
+        { wch: 22 },
+        { wch: 32 },
+        { wch: 14 },
+        { wch: 10 },
         ...headers.slice(5).map(h => ({ wch: h === 'Progress (%)' ? 12 : 20 })),
       ];
 
