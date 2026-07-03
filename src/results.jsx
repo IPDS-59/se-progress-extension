@@ -21,24 +21,24 @@ function aggregateUsers(rows = []) {
   const statusSet = new Set();
 
   for (const row of rows) {
-    if (!map.has(row.userId)) {
-      map.set(row.userId, {
-        userId:    row.userId,
-        username:  row.username  || '-',
-        email:     row.email     || '-',
-        roleName:  row.roleName  || '-',
-        total:     Number(row.userTotal) || 0,
-        byStatus:  {},
-        regions:   new Set(),
+    const key = row.userId + '::' + (row.regionCode || '');
+    if (!map.has(key)) {
+      map.set(key, {
+        userId:     row.userId,
+        username:   row.username   || '-',
+        email:      row.email      || '-',
+        roleName:   row.roleName   || '-',
+        regionCode: row.regionCode || '-',
+        total:      Number(row.regionTotal) || 0,
+        byStatus:   {},
       });
     }
-    const u = map.get(row.userId);
+    const u = map.get(key);
     u.byStatus[row.status] = (u.byStatus[row.status] || 0) + Number(row.count);
     statusSet.add(row.status);
-    if (row.regionCode) u.regions.add(row.regionCode);
   }
 
-  const users    = [...map.values()].map(u => ({ ...u, regionCount: u.regions.size }));
+  const users    = [...map.values()];
   const statuses = [...statusSet].sort();
   return { users, statuses };
 }
@@ -114,6 +114,8 @@ function App() {
 
   const doneStatus = useMemo(() => statuses.find(isDone), [statuses]);
 
+  const uniqueUserCount = useMemo(() => new Set(users.map(u => u.userId)).size, [users]);
+
   const totals = useMemo(() => {
     const target = users.reduce((s, u) => s + (u.total || 0), 0);
     const done   = doneStatus
@@ -130,7 +132,8 @@ function App() {
       list = list.filter(u =>
         u.username.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
-        u.roleName.toLowerCase().includes(q)
+        u.roleName.toLowerCase().includes(q) ||
+        u.regionCode.toLowerCase().includes(q)
       );
     }
     return [...list].sort((a, b) => {
@@ -159,14 +162,14 @@ function App() {
     try {
       await loadSheetJS();
 
-      const TEXT_COLS = new Set(['Username', 'Email', 'Peran']);
+      const TEXT_COLS = new Set(['Username', 'Email', 'Peran', 'Kode Wilayah']);
       const NUM_FMT   = '#,##0';
       const PCT_FMT   = '0"%"';
 
       const pivotRows = users.map((u, i) => {
         const done = doneStatus ? (u.byStatus[doneStatus] || 0) : 0;
         const pct  = u.total > 0 ? Math.round(done / u.total * 100) : 0;
-        const row  = { 'No.': i + 1, 'Username': u.username, 'Email': u.email, 'Peran': u.roleName, 'Target': u.total };
+        const row  = { 'No.': i + 1, 'Username': u.username, 'Email': u.email, 'Peran': u.roleName, 'Kode Wilayah': u.regionCode, 'Target': u.total };
         statuses.forEach(s => { row[s] = u.byStatus[s] || 0; });
         if (doneStatus) row['Progress (%)'] = pct;
         return row;
@@ -200,8 +203,9 @@ function App() {
         { wch: 22 },
         { wch: 32 },
         { wch: 14 },
+        { wch: 18 },
         { wch: 10 },
-        ...headers.slice(5).map(h => ({ wch: h === 'Progress (%)' ? 12 : 20 })),
+        ...headers.slice(6).map(h => ({ wch: h === 'Progress (%)' ? 12 : 20 })),
       ];
 
       const wb = XLSX.utils.book_new();
@@ -215,11 +219,11 @@ function App() {
   const downloadCSV = () => {
     if (!users.length) return;
     const esc = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    const headers = ['No.', 'Username', 'Email', 'Peran', 'Target', ...statuses, ...(doneStatus ? ['Progress (%)'] : [])];
+    const headers = ['No.', 'Username', 'Email', 'Peran', 'Kode Wilayah', 'Target', ...statuses, ...(doneStatus ? ['Progress (%)'] : [])];
     const rows = users.map((u, i) => {
       const done = doneStatus ? (u.byStatus[doneStatus] || 0) : 0;
       const pct  = u.total > 0 ? Math.round(done / u.total * 100) : 0;
-      const cols = [i + 1, u.username, u.email, u.roleName, u.total, ...statuses.map(s => u.byStatus[s] || 0), ...(doneStatus ? [pct] : [])];
+      const cols = [i + 1, u.username, u.email, u.roleName, u.regionCode, u.total, ...statuses.map(s => u.byStatus[s] || 0), ...(doneStatus ? [pct] : [])];
       return cols.map(esc).join(',');
     });
     const csv  = '﻿' + headers.map(esc).join(',') + '\n' + rows.join('\n');
@@ -293,7 +297,7 @@ function App() {
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-5">
         {/* ── Summary cards ─── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <SummaryCard label="Petugas Unik"  value={users.length.toLocaleString('id-ID')} />
+          <SummaryCard label="Petugas Unik"  value={uniqueUserCount.toLocaleString('id-ID')} />
           <SummaryCard label="Total Target"  value={totals.target.toLocaleString('id-ID')} />
           {doneStatus && (
             <SummaryCard
@@ -338,7 +342,7 @@ function App() {
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <span className="text-sm text-gray-500">
-            Menampilkan <strong>{filtered.length}</strong> dari {users.length} petugas
+            Menampilkan <strong>{filtered.length}</strong> dari {users.length} baris wilayah ({uniqueUserCount} petugas)
           </span>
         </div>
 
@@ -351,6 +355,7 @@ function App() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Username</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Kode Wilayah</th>
                   <th
                     className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
                     onClick={() => toggleSort('total')}
@@ -377,10 +382,11 @@ function App() {
                 {filtered.map((user, i) => {
                   const done = doneStatus ? (user.byStatus[doneStatus] || 0) : 0;
                   return (
-                    <tr key={user.userId} className="hover:bg-gray-50 transition-colors">
+                    <tr key={user.userId + '::' + user.regionCode} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-gray-400 tabular-nums">{i + 1}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{user.username}</td>
                       <td className="px-4 py-3 text-gray-500">{user.email}</td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{user.regionCode}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{user.total.toLocaleString('id-ID')}</td>
                       {statuses.map(s => (
                         <td key={s} className="px-4 py-3 text-right tabular-nums">
@@ -400,7 +406,7 @@ function App() {
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={4 + statuses.length + (doneStatus ? 1 : 0)}
+                      colSpan={5 + statuses.length + (doneStatus ? 1 : 0)}
                       className="text-center py-10 text-gray-400 text-sm"
                     >
                       Tidak ada data yang sesuai pencarian.
