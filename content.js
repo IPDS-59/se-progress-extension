@@ -3,13 +3,15 @@ const ASSIGN = BASE + '/analytic/api/v2/assignment/report-progress-by-responsibi
 const REGION = BASE + '/region/api/v1/region';
 const GROUP_ID = 'a45adac1-e711-4c15-b3f9-1f30fc151565';
 const SIZE_CANDIDATES = [10, 5];
-const CAP = 1000, DELAY_MS = 400, MAX_RETRY = 4;
+const CAP = 1000, DELAY_MS = 400, DELAY_JITTER_MS = 300, MAX_RETRY = 4;
 
 let isRunning = false;
 let currentRoleId = null;
 let SIZE = null;
+let seenRequests = null;
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const jitter = (base, spread = DELAY_JITTER_MS) => base + Math.random() * spread;
 
 const getCookie = (n) => {
   const m = document.cookie.match(new RegExp('(^|; )' + n + '=([^;]+)'));
@@ -52,7 +54,7 @@ async function getRegion(level, params) {
   for (let a = 0; a < MAX_RETRY; a++) {
     const res = await fetch(url, { credentials: 'include', headers: getHeaders() });
     if (res.ok) return findArr(await res.json()).map(o => ({ id: pickId(o), code: pickCode(o), name: pickName(o) }));
-    if ([502, 503, 504].includes(res.status)) { await sleep(2000 * 2 ** a); continue; }
+    if ([502, 503, 504].includes(res.status)) { await sleep(jitter(2000 * 2 ** a)); continue; }
     throw new Error('region/' + level + ' HTTP ' + res.status);
   }
   return [];
@@ -65,8 +67,12 @@ async function callAssign(page, size, region) {
     search: '', target: 'TARGET_ONLY', regionSummaryLevel: 6,
     page, size, region,
   };
+  const cacheKey = JSON.stringify({ page, size, region });
+  if (seenRequests && seenRequests.has(cacheKey)) return seenRequests.get(cacheKey);
   const res = await fetch(ASSIGN, { method: 'POST', credentials: 'include', headers: getHeaders(), body: JSON.stringify(payload) });
-  return { ok: res.ok, status: res.status, json: res.ok ? await res.json() : null };
+  const result = { ok: res.ok, status: res.status, json: res.ok ? await res.json() : null };
+  if (seenRequests && result.ok) seenRequests.set(cacheKey, result);
+  return result;
 }
 
 async function callRetry(page, size, region, label) {
@@ -75,8 +81,8 @@ async function callRetry(page, size, region, label) {
     try { r = await callAssign(page, size, region); } catch (e) { r = { ok: false, status: 0 }; }
     if (r.ok) return r;
     if ([0, 502, 503, 504].includes(r.status)) {
-      const w = 2000 * 2 ** a;
-      sendProgress('   retry ' + label + ' p' + page + ' (HTTP ' + r.status + ') ' + (w / 1000) + 's', 'warn');
+      const w = jitter(2000 * 2 ** a);
+      sendProgress('   retry ' + label + ' p' + page + ' (HTTP ' + r.status + ') ' + (w / 1000).toFixed(1) + 's', 'warn');
       await sleep(w);
       continue;
     }
@@ -95,7 +101,7 @@ async function fetchAll(region, label) {
     if (r.json.data.last) break;
     if (recs.length >= CAP) break;
     page++;
-    await sleep(DELAY_MS);
+    await sleep(jitter(DELAY_MS));
   }
   return { recs, total, error, capped: total != null && total > recs.length };
 }
@@ -121,6 +127,7 @@ async function handleGetKabs(role, prov) {
 async function handleFetchData(role, chosenKabs) {
   isRunning = true;
   currentRoleId = role.id;
+  seenRequests = new Map();
 
   chrome.storage.session.get('fasih').then(s => {
     chrome.storage.session.set({ fasih: { ...(s.fasih || {}), log: [] } });
@@ -151,6 +158,7 @@ async function handleFetchData(role, chosenKabs) {
   for (const kab of chosenKabs) {
     sendProgress('Proses ' + kab.name + '...', 'info', kab.name);
     let res = await fetchAll(regionObj(kab.id), kab.name);
+    await sleep(jitter(DELAY_MS));
 
     if (!res.error && !res.capped) {
       add(res.recs);
@@ -187,13 +195,14 @@ async function handleFetchData(role, chosenKabs) {
             if (rd.recs.length) add(rd.recs);
             cnt += rd.recs.length;
             if (rd.error) incomplete.push(kab.name + '/' + kec.name + '/' + d.name);
+            await sleep(jitter(DELAY_MS));
           }
         } catch (e) {
           sendProgress('     gagal desa ' + kec.name, 'error');
           incomplete.push(kab.name + '/' + kec.name);
         }
       }
-      await sleep(DELAY_MS);
+      await sleep(jitter(DELAY_MS));
     }
     report.push(kab.name + ': ~' + cnt + ' via ' + kecs.length + ' kec');
   }
