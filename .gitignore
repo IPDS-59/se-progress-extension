@@ -3,3 +3,4 @@ se_progress.js
 node_modules/
 credentials/
 .playwright-mcp/
+API_INVESTIGATION_BRIEF.md
