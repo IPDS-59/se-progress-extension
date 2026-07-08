@@ -13,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -33,19 +35,41 @@ jobs:
             popup.html popup.js popup.css \
             results.html results.js results.css
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="$PREV_TAG..HEAD"
+            SINCE="sejak $PREV_TAG"
+          else
+            RANGE="HEAD"
+            SINCE="awal"
+          fi
+
+          CHANGES=$(git log $RANGE --pretty=format:"- %s" --no-merges)
+
+          {
+            echo "NOTES<<EOF"
+            echo "## Cara Instalasi"
+            echo ""
+            echo "1. Download file **fasih-se-progress-${{ github.ref_name }}.zip** di bawah"
+            echo "2. Ekstrak ZIP ke folder mana saja"
+            echo "3. Buka Chrome → \`chrome://extensions\`"
+            echo "4. Aktifkan **Developer mode** (pojok kanan atas)"
+            echo "5. Klik **Load unpacked** → pilih folder hasil ekstrak"
+            echo "6. Buka \`https://fasih-sm.bps.go.id/app\` → klik ikon ekstensi"
+            echo ""
+            echo "> Koneksi VPN BPS diperlukan."
+            echo ""
+            echo "## Changelog ($SINCE)"
+            echo ""
+            echo "$CHANGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: fasih-se-progress-${{ github.ref_name }}.zip
-          generate_release_notes: true
-          body: |
-            ## Cara Instalasi
-
-            1. Download file **fasih-se-progress-${{ github.ref_name }}.zip** di bawah
-            2. Ekstrak ZIP ke folder mana saja
-            3. Buka Chrome → `chrome://extensions`
-            4. Aktifkan **Developer mode** (pojok kanan atas)
-            5. Klik **Load unpacked** → pilih folder hasil ekstrak
-            6. Buka `https://fasih-sm.bps.go.id/app` → klik ikon ekstensi
-
-            > Koneksi VPN BPS diperlukan.
+          body: ${{ steps.changelog.outputs.NOTES }}
